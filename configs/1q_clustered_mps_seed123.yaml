@@ -1,0 +1,18 @@
+experiment: 1q_clustered_mps_seed123
+paper_scale: true
+dataset: clustered
+seed: 123
+dataset_size: 100
+T: 6
+schedule: cosine
+schedule_offset: 0.001  # ASSUMPTION A-001: official code; paper omits epsilon.
+n_ancilla: 2
+depth: 4
+ancilla: haar
+loss: wasserstein
+epochs: 2001  # ASSUMPTION: official CLI default, not reported per-task by paper.
+learning_rate: 0.005  # ASSUMPTION: official CLI default.
+gamma: 1.0  # ASSUMPTION: no effective decay; paper factor/cadence unknown.
+init: normal
+device: mps
+output_root: outputs

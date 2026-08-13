@@ -1,0 +1,18 @@
+experiment: 1q_circular
+paper_scale: true
+dataset: circular
+seed: 42
+dataset_size: 200
+T: 6
+schedule: sq_cosine
+schedule_offset: 0.001  # ASSUMPTION A-001
+n_ancilla: 2
+depth: 8
+ancilla: zero
+loss: wasserstein
+epochs: 2001  # ASSUMPTION: official CLI default, paper does not report epochs.
+learning_rate: 0.005
+gamma: 1.0  # ASSUMPTION: no effective decay; paper decay factor/cadence unknown.
+init: normal
+device: auto
+output_root: outputs

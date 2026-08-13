@@ -1,0 +1,18 @@
+experiment: smoke_circular
+paper_scale: false
+dataset: circular
+seed: 11
+dataset_size: 10
+T: 2
+schedule: sq_cosine
+schedule_offset: 0.001
+n_ancilla: 1
+depth: 2
+ancilla: zero
+loss: mmd
+epochs: 12
+learning_rate: 0.02
+gamma: 1.0  # No effective LR decay in this smoke run.
+init: normal
+device: cpu
+output_root: outputs

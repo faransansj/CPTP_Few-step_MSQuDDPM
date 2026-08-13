@@ -1,0 +1,18 @@
+experiment: 1q_circular_mps_seed123
+paper_scale: true
+dataset: circular
+seed: 123
+dataset_size: 200
+T: 6
+schedule: sq_cosine
+schedule_offset: 0.001  # ASSUMPTION A-001: official code; paper omits epsilon.
+n_ancilla: 2
+depth: 8
+ancilla: zero
+loss: wasserstein
+epochs: 2001  # ASSUMPTION: official CLI default, not reported per-task by paper.
+learning_rate: 0.005  # ASSUMPTION: official CLI default.
+gamma: 1.0  # ASSUMPTION: no effective decay; paper factor/cadence unknown.
+init: normal
+device: mps
+output_root: outputs
