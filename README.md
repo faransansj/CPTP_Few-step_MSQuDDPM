@@ -4,6 +4,8 @@ PyTorch density-matrix reproduction of *Mixed-State Quantum Denoising Diffusion 
 
 This repository implements only the original MSQuDDPM teacher baseline. It does **not** implement Few-Step students or distillation.
 
+Current paper-scale MPS evidence and the gated planning-only next phase are documented in [`docs/PAPER_SCALE_MPS_RESULTS.md`](docs/PAPER_SCALE_MPS_RESULTS.md) and [`docs/NEXT_PHASE_ROADMAP.md`](docs/NEXT_PHASE_ROADMAP.md). The circular baseline is close to Table I across three seeds; the clustered reproduction remains unresolved, so the teacher baseline is not yet frozen.
+
 ## Installation
 
 ```bash

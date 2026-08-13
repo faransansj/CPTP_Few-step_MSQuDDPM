@@ -41,7 +41,7 @@ The implementation reproduces the complete original 1-qubit pipeline and traject
 
 Apple MPS is supported as a hybrid engineering execution backend. Device selection order is CUDA → MPS → CPU. MPS uses `float32/complex64`; CPU/CUDA retain `float64/complex128`. Circuit evolution, differentiable loss values, and parameter gradients run on MPS. Reproducible measurement sampling and POT's detached transport-plan solve are small CPU control operations; detached eigendecomposition diagnostics also run on CPU because MPS lacks complex Hermitian `eigh/eigvalsh`. This backend/precision change is marked △ rather than a paper-method change: circuit/channel/loss definitions are unchanged, but stochastic numerical results need not match CPU exactly.
 
-Validated MPS artifacts use `smoke_clustered_mps` and `smoke_circular_mps`; no paper-scale MPS claim is made.
+Engineering smoke artifacts use `smoke_clustered_mps` and `smoke_circular_mps`. Paper-scale seeds 7, 42, and 123 subsequently completed for both datasets; see [`PAPER_SCALE_MPS_RESULTS.md`](PAPER_SCALE_MPS_RESULTS.md). Circular is close to the reported Wasserstein result, while clustered consistently fails to recover the target (`F_gen,0=0.50468±0.02203` versus paper `0.9873`). A complete baseline reproduction claim is therefore not made.
 
 ## Interpretation limits
 

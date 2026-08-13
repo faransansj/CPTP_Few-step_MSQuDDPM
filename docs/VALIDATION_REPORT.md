@@ -77,6 +77,6 @@ Both evaluation, forward/reverse inspection, two-point quality sweeps, and all 1
 
 MPS does not support `float64/complex128` or complex `eigh/eigvalsh`. The implementation therefore selects `float32/complex64` centrally for MPS. Circuit evolution, differentiable costs, and parameter gradients remain on MPS. Reproducible categorical measurement draws use CPU probabilities/outcome indices, and Wasserstein uses POT on CPU to solve a detached transport plan; the chosen cost is then weighted and differentiated on MPS. Detached validation, state-fidelity, trace-distance, and eigenvalue-plot inputs also use CPU `complex128`. Thus the validated path is intentionally hybrid rather than fully GPU-native.
 
-## Bounded resource exception
+## Paper-scale follow-up
 
-Paper configs require six greedy blocks, 100/200 samples, deeper circuits, Wasserstein OT each epoch, and 2001 assumed epochs per block. They were not executed as part of CPU smoke validation, so this report does not claim reproduction of Table-I values. The configs are preserved for an explicitly budgeted paper-scale run.
+Paper-scale MPS configs subsequently completed for seeds 7, 42, and 123 on both datasets. All six evaluations and trajectories passed physical validation. Circular Wasserstein was `0.01396±0.00179`, close to paper `0.0151`; clustered `F_gen,0` was `0.50468±0.02203`, far from paper `0.9873`. Exact per-seed runtimes, metrics, limitations, and artifacts are recorded in [`PAPER_SCALE_MPS_RESULTS.md`](PAPER_SCALE_MPS_RESULTS.md). This is a successful execution/validation result but not a complete reproduction claim because clustered remains unresolved.
