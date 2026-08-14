@@ -202,7 +202,14 @@ def test_mps_precision_forward_reverse_and_optimizer():
     before = model.theta.detach().cpu().clone()
     # Exercise the paper-scale loss path too: POT solves the detached transport
     # plan on CPU, while the selected cost and parameter gradients remain on MPS.
-    result = train_greedy(model, forward, epochs=1, learning_rate=0.01, loss_name="wasserstein")
+    result = train_greedy(
+        model,
+        forward,
+        epochs=1,
+        learning_rate=0.01,
+        loss_name="wasserstein",
+        lr_decay_count=1,
+    )
     mixed = torch.eye(2, dtype=precision.complex, device=device)[None].repeat(4, 1, 1) / 2
     reverse = model.generate(mixed, True)
     assert states.device.type == forward.get_state(1).device.type == reverse.get_state(0).device.type == "mps"
