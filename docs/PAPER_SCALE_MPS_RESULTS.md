@@ -11,6 +11,24 @@ Date: 2026-08-13. Backend: Apple Silicon MPS (`float32/complex64`), with documen
 | Clustered | `F_data,0=0.9853±0.0001`, `F_gen,0=0.9873±1e-5` | `F_data,0=0.98588±0.00099`, `F_gen,0=0.50468±0.02203` | Invalidated by wrong CZ topology |
 | Circular | `Wass_data=0.0063`, `Wass_gen=0.0151` | generated-vs-target Wasserstein `0.01396±0.00179` | Invalidated by wrong CZ topology |
 
+## Invalidated seed-42 figure gallery
+
+These images are retained to show the historical failure mode. They were generated before the CZ-topology correction and are not current reproduction evidence.
+
+### Circular — historical pre-fix output
+
+| Ground truth vs generated | Training loss |
+|---|---|
+| ![Circular ground truth vs generated](figures/paper_scale_mps/circular_seed42/09_ground_truth_vs_generated.png) | ![Circular training loss](figures/paper_scale_mps/circular_seed42/05_training_loss.png) |
+
+### Clustered — historical pre-fix failure
+
+| Ground truth vs generated | Training loss |
+|---|---|
+| ![Clustered ground truth vs generated](figures/paper_scale_mps/clustered_seed42/09_ground_truth_vs_generated.png) | ![Clustered training loss](figures/paper_scale_mps/clustered_seed42/05_training_loss.png) |
+
+All 12 invalidated historical figures for each dataset are retained under [`figures/paper_scale_mps/`](figures/paper_scale_mps/README.md).
+
 Additional distribution diagnostics:
 
 | Dataset | Superfidelity | MMD | Runtime/seed |

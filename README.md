@@ -4,7 +4,7 @@ PyTorch density-matrix reproduction of *Mixed-State Quantum Denoising Diffusion 
 
 This repository implements only the original MSQuDDPM teacher baseline. It does **not** implement Few-Step students or distillation.
 
-The clustered failure was traced to an incorrect alternating-CZ implementation: the official circuit applies every neighboring CZ in every layer. After correction, a diagnostic CPU three-seed run reached `F_gen,0=0.96269±0.02010`, passing the predeclared mean target of `0.95`. The earlier MPS results used the incorrect circuit and are retained only as invalidated historical evidence. The teacher baseline remains unfrozen until clean CPU artifacts and provenance are recorded; see [`docs/REPRODUCTION_REPORT.md`](docs/REPRODUCTION_REPORT.md) and [`docs/NEXT_PHASE_ROADMAP.md`](docs/NEXT_PHASE_ROADMAP.md).
+The clustered failure was traced to an incorrect alternating-CZ implementation: the official circuit applies every neighboring CZ in every layer. After correction, a diagnostic CPU three-seed run reached `F_gen,0=0.96269±0.02010`, passing the predeclared mean target of `0.95`. The earlier MPS results used the incorrect circuit and are retained only as invalidated historical evidence, including the [seed-42 figure gallery](docs/figures/paper_scale_mps/README.md). The teacher baseline remains unfrozen until clean CPU artifacts and provenance are recorded; see [`docs/REPRODUCTION_REPORT.md`](docs/REPRODUCTION_REPORT.md) and [`docs/NEXT_PHASE_ROADMAP.md`](docs/NEXT_PHASE_ROADMAP.md).
 
 ## Installation
 
