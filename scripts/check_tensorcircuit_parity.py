@@ -9,7 +9,7 @@ from msquddpm.reverse_model import ReverseMSQuDDPM
 try:
     import tensorcircuit as tc
 except ImportError as error:
-    raise SystemExit("Install optional tensorcircuit==0.11.0 to run this check") from error
+    raise SystemExit("Run with: uv run --locked --with tensorcircuit==0.11.0 python scripts/check_tensorcircuit_parity.py") from error
 
 
 tc.set_backend("pytorch")

@@ -1,20 +1,19 @@
 # Validation Report — Steps 2–8
 
-Date: 2026-08-13. Environment: Python 3.11.15, PyTorch 2.13.0, CPU smoke configurations.
+Date: 2026-08-13. Environment: Python 3.11.15, PyTorch 2.13.0, CPU smoke configurations. Command spellings were normalized to the locked `uv` workflow on 2026-08-14; `uv sync`, the full tests, and clustered smoke were rerun, while the other outcome rows retain the original validated evidence.
 
 ## Commands and outcomes
 
 | Command | Exit | Result |
 |---|---:|---|
-| `uv venv --python /opt/homebrew/bin/python3.11 .venv` | 0 | Environment created |
-| `uv pip install --python .venv/bin/python -e '.[test]'` | 0 | Dependencies installed |
-| `.venv/bin/pytest -q` | 0 | 8 passed, 1 CUDA-only test skipped |
-| `.venv/bin/python scripts/train.py --config configs/smoke_clustered.yaml` | 0 | 2 reverse blocks × 12 epochs |
-| `.venv/bin/python scripts/train.py --config configs/smoke_circular.yaml` | 0 | 2 reverse blocks × 12 epochs |
-| `.venv/bin/python scripts/quality_sweep.py --config ... --steps 1 2` (both) | 0 | two-point additional smoke sweep CSVs |
-| `.venv/bin/python scripts/evaluate.py --checkpoint ...` (both) | 0 | finite metrics, complete valid trajectories |
-| `.venv/bin/python scripts/inspect_trajectory.py ...` (four directions) | 0 | forward/reverse step 0–2 inspected for both datasets |
-| `.venv/bin/python scripts/visualize.py --experiment ...` (both) | 0 | 12 PNGs each, Figure 10 consumes sweep CSV |
+| `uv sync --extra test --locked` | 0 | Python 3.11 environment and locked dependencies installed |
+| `uv run --locked pytest -q` | 0 | 9 passed, 2 hardware-only tests skipped |
+| `uv run --locked python scripts/train.py --config configs/smoke_clustered.yaml` | 0 | 2 reverse blocks × 12 epochs, rerun after migration |
+| `uv run --locked python scripts/train.py --config configs/smoke_circular.yaml` | 0 | 2 reverse blocks × 12 epochs |
+| `uv run --locked python scripts/quality_sweep.py --config ... --steps 1 2` (both) | 0 | two-point additional smoke sweep CSVs |
+| `uv run --locked python scripts/evaluate.py --checkpoint ...` (both) | 0 | finite metrics, complete valid trajectories |
+| `uv run --locked python scripts/inspect_trajectory.py ...` (four directions) | 0 | forward/reverse step 0–2 inspected for both datasets |
+| `uv run --locked python scripts/visualize.py --experiment ...` (both) | 0 | 12 PNGs each, Figure 10 consumes sweep CSV |
 
 Development/review exposed and fixed detached categorical probability NaNs, differentiation through complex eigendecomposition, RX/RY action order, frozen measurement draws, and incomplete teacher/metric contracts. One corrected training invocation returned shell exit 1 only because `tee` targeted a deleted output directory; the training itself finished. The directory was created and the identical deterministic clustered run was rerun successfully.
 

@@ -34,7 +34,7 @@ The implementation reproduces the complete original 1-qubit pipeline and traject
 
 The failed implementation used `range(layer % 2, total - 1, 2)`, applying only one parity of CZ edges per layer. For the paper's three-qubit register, each layer therefore omitted one of `CZ(0,1)` or `CZ(1,2)`. The official TensorCircuit code executes both pair loops in every layer.
 
-After changing the native unitary to apply all neighboring CZ edges, `scripts/check_tensorcircuit_parity.py` matched TensorCircuit with maximum absolute error `3.33e-16` against tolerance `1e-12`. Run it after `uv pip install --python .venv/bin/python tensorcircuit==0.11.0`. Official pretrained clustered parameters evaluated through the corrected circuit produced `F_gen,0` values `0.98714`, `0.98243`, and `0.98722` for seeds 7, 42, and 123.
+After changing the native unitary to apply all neighboring CZ edges, `scripts/check_tensorcircuit_parity.py` matched TensorCircuit with maximum absolute error `3.33e-16` against tolerance `1e-12`. Run it without modifying the locked environment using `uv run --locked --with tensorcircuit==0.11.0 python scripts/check_tensorcircuit_parity.py`. Official pretrained clustered parameters evaluated through the corrected circuit produced `F_gen,0` values `0.98714`, `0.98243`, and `0.98722` for seeds 7, 42, and 123.
 
 Corrected paper-scale CPU diagnostics using official sampling semantics produced:
 

@@ -9,38 +9,36 @@ The clustered failure was traced to an incorrect alternating-CZ implementation: 
 ## Installation
 
 ```bash
-uv venv --python /opt/homebrew/bin/python3.11
-uv pip install --python .venv/bin/python -e '.[test]'
+uv sync --extra test --locked
+uv run --locked pytest -q
 ```
+
+`uv` 0.11 or newer reads `.python-version`, creates and manages `.venv`, and installs the exact versions in `uv.lock`; manual activation and `pip` are unnecessary. The locked Torch wheels support Apple Silicon on macOS 14+, Linux with glibc 2.28+ on x86-64/AArch64, and Windows x86-64. Intel macOS is not supported by this lock.
 
 `device: auto` selects CUDA, then Apple MPS, then CPU. CPU/CUDA use `float64/complex128`; MPS uses `float32/complex64`. Circuit evolution and differentiable losses run on the selected accelerator. Reproducible categorical measurement sampling and POT's detached optimal-transport-plan solve are CPU control operations; gradients through the selected Wasserstein cost remain on the accelerator. MPS additionally sends detached eigendecomposition diagnostics to CPU because PyTorch MPS lacks complex Hermitian eigensolvers. MPS validation uses `atol=2e-5` versus `1e-7` at research precision.
 
 ## CUDA server quick start
 
-The project does not install a CUDA toolkit itself. Use a server/driver-supported PyTorch CUDA wheel, then install this repository without replacing that wheel.
+The project does not install a system-wide CUDA toolkit. On Linux, the locked PyTorch package includes its user-space CUDA 13 libraries. Use the lock when the server driver supports it; otherwise apply the explicit CUDA 12.8 deviation below and revalidate that environment.
 
 ```bash
 git clone https://github.com/faransansj/CPTP_Few-step_MSQuDDPM.git
 cd CPTP_Few-step_MSQuDDPM
 
-# Python 3.11 virtual environment
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+# Create the locked Python 3.11 environment.
+uv sync --extra test --locked
 
-# Install the CUDA wheel matching the server driver. Example for CUDA 12.8:
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-# Then install this project and tests without asking pip to replace torch.
-pip install -e '.[test]' --no-deps
-pip install 'numpy>=1.26,<2' 'scipy>=1.11,<2' 'matplotlib>=3.8,<4' \
-  'pandas>=2.1,<3' 'pyyaml>=6,<7' 'POT>=0.9,<1' 'pytest>=8,<9'
+# Optional CUDA 12.8 deviation: replace the locked Torch stack with a pinned wheel.
+# Use `uv run --no-sync` afterward so the project lock is not reapplied.
+uv pip install --reinstall 'torch==2.11.0+cu128' \
+  --index-url https://download.pytorch.org/whl/cu128
 ```
 
 Confirm that the GPU is really visible:
 
 ```bash
 nvidia-smi
-python - <<'PY'
+uv run --no-sync python - <<'PY'
 import torch
 print("torch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
@@ -53,28 +51,30 @@ PY
 Run tests and a CUDA smoke training before paper-scale jobs:
 
 ```bash
-pytest -q
-python scripts/train.py --config configs/smoke_clustered_cuda.yaml
-python scripts/train.py --config configs/smoke_circular_cuda.yaml
-python scripts/evaluate.py \
+uv run --no-sync pytest -q
+uv run --no-sync python scripts/train.py --config configs/smoke_clustered_cuda.yaml
+uv run --no-sync python scripts/train.py --config configs/smoke_circular_cuda.yaml
+uv run --no-sync python scripts/evaluate.py \
   --checkpoint outputs/checkpoints/smoke_clustered_cuda.pt --device cuda
 ```
 
 Paper-scale configs use `device: auto`, which selects CUDA on a CUDA server:
 
 ```bash
-python scripts/train.py --config configs/1q_clustered.yaml
-python scripts/train.py --config configs/1q_circular.yaml
+uv run --no-sync python scripts/train.py --config configs/1q_clustered.yaml
+uv run --no-sync python scripts/train.py --config configs/1q_circular.yaml
 ```
 
 For an unattended server job, keep stdout and timing information:
 
 ```bash
 mkdir -p outputs/logs
-nohup /usr/bin/time -v python scripts/train.py --config configs/1q_clustered.yaml \
+nohup /usr/bin/time -v uv run --no-sync python scripts/train.py --config configs/1q_clustered.yaml \
   > outputs/logs/1q_clustered_cuda.log 2>&1 &
 echo $! > outputs/logs/1q_clustered_cuda.pid
 ```
+
+The CUDA 12.8 override is intentionally outside `uv.lock` and may replace related Torch dependencies. To restore the baseline exactly, delete `.venv` and rerun `uv sync --extra test --locked`.
 
 Generated checkpoints, trajectories, figures, metrics, histories, and logs live under `outputs/` and are intentionally git-ignored. Copy them separately from the server. CUDA currently uses `float64/complex128`; verify that the selected GPU supports efficient FP64 if runtime matters. The POT transport-plan solve and measurement sampling remain CPU-assisted, so additional CPU cores and fast host-device transfers still help.
 
@@ -83,11 +83,11 @@ Generated checkpoints, trajectories, figures, metrics, histories, and logs live 
 Apple Silicon smoke run:
 
 ```bash
-.venv/bin/python scripts/train.py --config configs/smoke_clustered_mps.yaml
-.venv/bin/python scripts/train.py --config configs/smoke_circular_mps.yaml
-.venv/bin/python scripts/evaluate.py --checkpoint outputs/checkpoints/smoke_clustered_mps.pt --device mps
-.venv/bin/python scripts/quality_sweep.py --config configs/smoke_clustered_mps.yaml --steps 1 2
-.venv/bin/python scripts/visualize.py --experiment smoke_clustered_mps
+uv run --locked python scripts/train.py --config configs/smoke_clustered_mps.yaml
+uv run --locked python scripts/train.py --config configs/smoke_circular_mps.yaml
+uv run --locked python scripts/evaluate.py --checkpoint outputs/checkpoints/smoke_clustered_mps.pt --device mps
+uv run --locked python scripts/quality_sweep.py --config configs/smoke_clustered_mps.yaml --steps 1 2
+uv run --locked python scripts/visualize.py --experiment smoke_clustered_mps
 ```
 
 Known limit: this is a hybrid MPS execution path, not a claim that every auxiliary operation is GPU-native. MPS results are lower-precision stochastic diagnostics and are not expected to equal CPU metrics exactly. Checkpoint loading stages through CPU to avoid materializing float64 schedule metadata on MPS.
@@ -103,15 +103,15 @@ Known limit: this is a hybrid MPS execution path, not a claim that every auxilia
 Paper-scale configuration (expensive; Table-I result is not claimed until run):
 
 ```bash
-.venv/bin/python scripts/train.py --config configs/1q_clustered.yaml
-.venv/bin/python scripts/train.py --config configs/1q_circular.yaml
+uv run --locked python scripts/train.py --config configs/1q_clustered.yaml
+uv run --locked python scripts/train.py --config configs/1q_circular.yaml
 ```
 
 CPU smoke reproduction:
 
 ```bash
-.venv/bin/python scripts/train.py --config configs/smoke_clustered.yaml
-.venv/bin/python scripts/train.py --config configs/smoke_circular.yaml
+uv run --locked python scripts/train.py --config configs/smoke_clustered.yaml
+uv run --locked python scripts/train.py --config configs/smoke_circular.yaml
 ```
 
 Training follows the paper's greedy `T → 1` process. Each RX/RY/CZ block is separately addressable with `model.reverse_step(rho, t)`. Ancilla Z measurements sample conditional post-measurement states; outcomes are not postselected or retained as labels.
@@ -119,7 +119,7 @@ Training follows the paper's greedy `T → 1` process. Each RX/RY/CZ block is se
 ## Evaluation
 
 ```bash
-.venv/bin/python scripts/evaluate.py --checkpoint outputs/checkpoints/smoke_clustered.pt
+uv run --locked python scripts/evaluate.py --checkpoint outputs/checkpoints/smoke_clustered.pt
 ```
 
 CSV output contains nearest-state fidelity/superfidelity, trace distance, MMD, Wasserstein, purity error, Bloch radii, and the clustered paper metric `F_data_0`/`F_gen_0 = mean(<0|rho|0>)`. Distributional MMD/Wasserstein are primary; nearest-state metrics are diagnostics.
@@ -127,14 +127,14 @@ CSV output contains nearest-state fidelity/superfidelity, trace distance, MMD, W
 ## Visualization
 
 ```bash
-.venv/bin/python scripts/visualize.py --experiment smoke_clustered
+uv run --locked python scripts/visualize.py --experiment smoke_clustered
 ```
 
 First run the bounded **additional smoke experiment** (not a paper/Table-I sweep), then render figures:
 
 ```bash
-.venv/bin/python scripts/quality_sweep.py --config configs/smoke_clustered.yaml --steps 1 2
-.venv/bin/python scripts/visualize.py --experiment smoke_clustered
+uv run --locked python scripts/quality_sweep.py --config configs/smoke_clustered.yaml --steps 1 2
+uv run --locked python scripts/visualize.py --experiment smoke_clustered
 ```
 
 This creates all required files `01_dataset_bloch.png` through `12_eigenvalue_evolution.png` under `outputs/figures/<experiment>/`. Figure 10 consumes `outputs/metrics/<experiment>_quality_vs_steps.csv` and requires at least two actual trained T values.
@@ -142,8 +142,8 @@ This creates all required files `01_dataset_bloch.png` through `12_eigenvalue_ev
 ## Trajectory inspection
 
 ```bash
-.venv/bin/python scripts/inspect_trajectory.py --experiment smoke_clustered --direction forward
-.venv/bin/python scripts/inspect_trajectory.py --experiment smoke_clustered --direction reverse
+uv run --locked python scripts/inspect_trajectory.py --experiment smoke_clustered --direction forward
+uv run --locked python scripts/inspect_trajectory.py --experiment smoke_clustered --direction reverse
 ```
 
 API:
