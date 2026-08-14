@@ -159,6 +159,20 @@ trajectory = load_trajectory("trajectory.pt")
 
 Teacher `.npz` files expose `forward_sample_id`, `reverse_sample_id`, legacy positional `sample_id`, `paired=false`, `rho_0...rho_T`, and `reverse_rho_0...reverse_rho_T`. Forward and reverse rows are independent ensemble paths; equal row indices do not imply coupled samples.
 
+## Teacher artifact contract and canonical baselines
+
+Frozen teacher baselines use the strict Teacher artifact schema v1 (steps 0–6, `(batch, 2, 2)` complex128, tolerance 1e-8, both forward and reverse chains, unpickled scalar/string metadata with config/checkpoint hashes). See [`docs/TEACHER_ARTIFACT_SCHEMA.md`](docs/TEACHER_ARTIFACT_SCHEMA.md) for the full schema and policies.
+
+Canonical CPU baseline configs live in `configs/baselines/` (`clustered_seed{7,42,123}.yaml`, `circular_seed{7,42,123}.yaml`). They require a clean Git worktree and write an immutable `manifest.json` provenance record; reruns fail rather than overwrite. Clustered acceptance is aggregate-only: mean `F_gen,0 ≥ 0.95` across seeds 7/42/123, never per-seed. Circular configs carry an unresolved acceptance-metric TODO and are blocked by preflight.
+
+```bash
+uv run --locked python scripts/train.py --config configs/baselines/clustered_seed7.yaml
+uv run --locked python scripts/validate_teacher.py \
+  outputs/baselines/clustered_seed7/trajectories/clustered_seed7_teacher.npz \
+  --config outputs/baselines/clustered_seed7/config.resolved.yaml \
+  --checkpoint outputs/baselines/clustered_seed7/checkpoints/clustered_seed7.pt
+```
+
 ## Reproduction procedure
 
 1. Read [`docs/STEP1_PAPER_AND_OFFICIAL_CODE_ANALYSIS.md`](docs/STEP1_PAPER_AND_OFFICIAL_CODE_ANALYSIS.md).

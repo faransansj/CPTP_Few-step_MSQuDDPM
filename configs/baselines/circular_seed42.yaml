@@ -1,0 +1,34 @@
+# Canonical CPU teacher baseline: circular, seed 42.
+# Hyperparameters copied from configs/1q_circular.yaml (paper/official) with all
+# hidden values explicit. Do not edit in place; baseline outputs are immutable.
+experiment: circular_seed42
+paper_scale: true
+canonical_baseline: true
+dataset: circular
+seed: 42
+dataset_size: 200
+T: 6
+schedule: sq_cosine
+schedule_offset: 0.001  # ASSUMPTION A-001
+n_ancilla: 2
+depth: 8
+ancilla: zero
+loss: wasserstein
+epochs: 2001  # ASSUMPTION: official CLI default, paper does not report epochs.
+learning_rate: 0.005
+gamma: 1.0  # ASSUMPTION: no effective decay; paper decay factor/cadence unknown.
+lr_decay_count: 2  # Official count includes the initial rate: one decay when gamma != 1.
+sampling_semantics: official
+init: normal
+device: cpu
+dtype: complex128
+artifact_schema_version: 1
+validation_tolerance: 1.0e-8
+provenance_manifest: true
+parent_run_id: null
+immutable_output: true
+output_root: outputs/baselines/circular_seed42
+# Preflight blocks canonical circular runs while this TODO is unresolved.
+circular_acceptance_criterion: >-
+  TODO: Finalize Circular baseline evaluation metric, acceptance threshold,
+  and tolerance before running the canonical Circular baseline experiments.

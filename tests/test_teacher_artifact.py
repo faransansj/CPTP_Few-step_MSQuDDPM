@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -53,6 +55,7 @@ def test_valid_teacher_v1_roundtrip_and_metadata(tmp_path):
         expected_dataset="clustered",
         expected_seed=7,
         expected_config_sha256="a" * 64,
+        expected_git_commit="b" * 40,
         expected_checkpoint_sha256="c" * 64,
     )
 
@@ -69,6 +72,11 @@ def test_valid_teacher_v1_roundtrip_and_metadata(tmp_path):
     assert teacher.forward.steps == teacher.reverse.steps == list(range(7))
     assert teacher.forward.get_state(3).shape == (2, 2, 2)
     assert teacher.physicality["passed"]
+    assert teacher.physicality["num_failed_states"] == 0
+    assert teacher.physicality["failed_indices"] == []
+    assert set(teacher.physicality["steps"]) == {f"rho_{t}" for t in range(7)} | {
+        f"reverse_rho_{t}" for t in range(7)
+    }
     with np.load(path, allow_pickle=False) as data:
         assert all(data[key].dtype != object for key in data.files)
         assert {f"rho_{t}" for t in range(7)} <= set(data.files)
@@ -80,6 +88,13 @@ def test_valid_teacher_v1_roundtrip_and_metadata(tmp_path):
     [
         (lambda data: data.pop("rho_3"), "missing.*rho_3"),
         (lambda data: data.__setitem__("schema_version", np.asarray(2)), "schema_version"),
+        (lambda data: data.__setitem__("schema_version", np.asarray(1.9)), "schema_version.*integer"),
+        (lambda data: data.__setitem__("seed", np.asarray(True)), "seed.*integer"),
+        (lambda data: data.__setitem__("steps", np.arange(7, dtype=float) + 0.1), "steps.*invalid"),
+        (lambda data: data.__setitem__("sample_id", np.arange(2, dtype=float)), "sample_id.*integer"),
+        (lambda data: data.__setitem__("paired", np.asarray(0)), "paired.*boolean"),
+        (lambda data: data.__setitem__("validation_tolerance", np.asarray(1e-4)), "validation_tolerance"),
+        (lambda data: data.__setitem__("paired", np.asarray(True)), "paired"),
         (lambda data: data.__setitem__("rho_3", data["rho_3"][:1]), "rho_3.*shape"),
         (lambda data: data.__setitem__("rho_3", data["rho_3"].astype(np.complex64)), "rho_3.*complex128"),
         (lambda data: data["rho_3"].__setitem__((0, 0, 0), np.nan), "rho_3.*sample 0.*finite"),
@@ -93,6 +108,41 @@ def test_teacher_loader_rejects_invalid_artifacts(tmp_path, change, message):
     _rewrite(path, change)
     with pytest.raises(TeacherArtifactError, match=message):
         load_teacher_trajectory(path)
+
+
+def test_teacher_saver_materializes_valid_conjugate_views(tmp_path):
+    forward, reverse = _trajectories()
+    forward = Trajectory({t: state.conj() for t, state in forward.states.items()}, "forward")
+    path = save_teacher_artifact(
+        forward,
+        reverse,
+        tmp_path / "teacher.npz",
+        dataset="clustered",
+        seed=7,
+        config_sha256="a" * 64,
+        git_commit="b" * 40,
+        checkpoint_sha256="c" * 64,
+    )
+    loaded = load_teacher_trajectory(path)
+    assert torch.equal(loaded.forward.get_state(0), forward.get_state(0).resolve_conj())
+
+
+def test_teacher_saver_rejects_coercion_without_overwriting(tmp_path):
+    path = tmp_path / "teacher.npz"
+    path.write_bytes(b"keep")
+    forward, reverse = _trajectories()
+    with pytest.raises(TeacherArtifactError, match="seed must be an integer"):
+        save_teacher_artifact(
+            forward,
+            reverse,
+            path,
+            dataset="clustered",
+            seed=7.0,
+            config_sha256="a" * 64,
+            git_commit="b" * 40,
+            checkpoint_sha256="c" * 64,
+        )
+    assert path.read_bytes() == b"keep"
 
 
 def test_teacher_loader_rejects_hash_mismatch_and_corruption(tmp_path):
@@ -156,16 +206,30 @@ def test_smoke_serializer_loader_manifest_and_collision(tmp_path):
     assert manifest["manifest_schema_version"] == 1
     assert manifest["success"] is True and manifest["error"] is None
     assert manifest["git"]["commit"] and isinstance(manifest["git"]["dirty"], bool)
+    assert manifest["config"]["path"] == "config.resolved.yaml"
     assert manifest["config"]["sha256"] == sha256_file(root / "config.resolved.yaml")
+    assert manifest["config"]["source_path"] == config["config_path"]
+    assert manifest["config"]["source_sha256"] == sha256_file(config["config_path"])
+    assert "config_path" not in yaml.safe_load((root / "config.resolved.yaml").read_text())
     assert manifest["environment"]["python_version"]
     assert manifest["environment"]["uv_version"]
     assert manifest["environment"]["packages"]
     assert manifest["device"] == "cpu" and manifest["dtype"] == "complex128"
     assert manifest["dataset"] == "clustered" and manifest["seed"] == 5
     assert manifest["sampling_semantics"] == "official"
+    assert manifest["start_time"].endswith("+00:00")
+    assert manifest["end_time"].endswith("+00:00")
     assert manifest["runtime_seconds"] >= 0
+    assert manifest["peak_rss_bytes"] is None or manifest["peak_rss_bytes"] > 0
+    assert manifest["parent_run_id"] is None
     assert manifest["artifacts"]["checkpoint_sha256"] == sha256_file(result["checkpoint"])
     assert manifest["artifacts"]["trajectory_sha256"] == sha256_file(result["teacher"])
+    assert set(manifest["artifacts"]["files"]) == {
+        "checkpoint", "teacher", "forward_pt", "forward_npz", "reverse_pt", "reverse_npz",
+        "history", "metrics", "summary",
+    }
+    for artifact in manifest["artifacts"]["files"].values():
+        assert artifact["sha256"] == sha256_file(artifact["path"])
     assert manifest["physicality"]["passed"]
     assert "F_gen_0" in manifest["metrics"]
     load_teacher_trajectory(
@@ -180,6 +244,17 @@ def test_smoke_serializer_loader_manifest_and_collision(tmp_path):
     assert (root / "manifest.json").read_bytes() == before
 
 
+def test_immutable_output_rejects_existing_directory(tmp_path):
+    config = load_config(_tiny_provenance_config(tmp_path, "occupied"))
+    root = Path(config["output_root"])
+    root.mkdir()
+    sentinel = root / "keep.txt"
+    sentinel.write_text("do not overwrite")
+    with pytest.raises(FileExistsError, match="already exists"):
+        train_experiment(config)
+    assert sentinel.read_text() == "do not overwrite"
+
+
 def test_failed_run_writes_manifest(tmp_path):
     config = load_config(_tiny_provenance_config(tmp_path, "failed", device="invalid"))
     with pytest.raises(Exception):
@@ -187,6 +262,26 @@ def test_failed_run_writes_manifest(tmp_path):
     manifest = json.loads((Path(config["output_root"]) / "manifest.json").read_text())
     assert manifest["success"] is False
     assert "invalid" in manifest["error"]
+    assert manifest["metrics"] is None
+    assert manifest["physicality"] is None
+    assert manifest["artifacts"] == {}
+    assert manifest["start_time"].endswith("+00:00")
+    assert manifest["end_time"].endswith("+00:00")
+
+
+def test_base_exception_writes_failure_manifest(tmp_path, monkeypatch):
+    config = load_config(_tiny_provenance_config(tmp_path, "interrupted"))
+
+    def interrupt(*args, **kwargs):
+        raise KeyboardInterrupt("stopped")
+
+    monkeypatch.setattr("msquddpm.experiment._run_training", interrupt)
+    with pytest.raises(KeyboardInterrupt, match="stopped"):
+        train_experiment(config)
+    manifest = json.loads((Path(config["output_root"]) / "manifest.json").read_text())
+    assert manifest["success"] is False
+    assert manifest["error"] == "KeyboardInterrupt: stopped"
+    assert manifest["end_time"].endswith("+00:00")
 
 
 def test_canonical_cpu_configs_and_preflight():
@@ -209,16 +304,40 @@ def test_canonical_cpu_configs_and_preflight():
         assert config["sampling_semantics"] == "official"
         assert config["artifact_schema_version"] == 1
         assert config["validation_tolerance"] == 1e-8
+        assert config["parent_run_id"] is None
         assert config["seed"] in {7, 42, 123}
         assert config["output_root"] not in output_roots
         output_roots.add(config["output_root"])
 
     clustered = yaml.safe_load((root / "configs/baselines/clustered_seed7.yaml").read_text())
+    assert clustered["cluster_acceptance"] == {
+        "metric": "F_gen_0",
+        "aggregation": "mean",
+        "seeds": [7, 42, 123],
+        "minimum": 0.95,
+        "per_seed_pass_fail": False,
+    }
     validate_canonical_baseline_config(clustered, git_dirty=False)
     with pytest.raises(RuntimeError, match="clean Git"):
         validate_canonical_baseline_config(clustered, git_dirty=True)
 
     circular = yaml.safe_load((root / "configs/baselines/circular_seed7.yaml").read_text())
-    assert circular["circular_acceptance_criterion"].startswith("TODO:")
+    assert circular["circular_acceptance_criterion"] == (
+        "TODO: Finalize Circular baseline evaluation metric, acceptance threshold, and tolerance "
+        "before running the canonical Circular baseline experiments."
+    )
     with pytest.raises(RuntimeError, match="Circular baseline evaluation metric"):
         validate_canonical_baseline_config(circular, git_dirty=False)
+
+
+def test_sha256_known_value_and_validation_cli_missing_input(tmp_path):
+    file = tmp_path / "value.txt"
+    file.write_bytes(b"abc")
+    assert sha256_file(file) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+    script = Path(__file__).parents[1] / "scripts" / "validate_teacher.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path / "missing.npz")], capture_output=True, text=True
+    )
+    assert result.returncode == 1
+    assert "INVALID" in result.stderr and "missing.npz" in result.stderr
