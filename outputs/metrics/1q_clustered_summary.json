@@ -1,0 +1,18 @@
+{
+  "device": "cuda",
+  "real_dtype": "torch.float64",
+  "complex_dtype": "torch.complex128",
+  "checkpoint": "outputs/checkpoints/1q_clustered.pt",
+  "metrics": {
+    "superfidelity": 0.982880180425276,
+    "fidelity": 0.9828801804037732,
+    "trace_distance": 0.04580171037604559,
+    "mmd": 0.040933725303017976,
+    "wasserstein": 0.02221604280520524,
+    "purity_error": 0.06382283639987041,
+    "generated_radius": 0.9286989794503755,
+    "target_radius": 0.9951751206653288,
+    "F_data_0": 0.9838964473905705,
+    "F_gen_0": 0.9510476859725614
+  }
+}

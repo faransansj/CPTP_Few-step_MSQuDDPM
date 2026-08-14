@@ -4,4 +4,12 @@ __pycache__/
 *.egg-info/
 .research/
 .pi/
-outputs/
+
+# Model checkpoints
+outputs/checkpoints/
+
+# Large trajectory artifacts
+outputs/trajectories/
+
+# Generated figures
+# outputs/figures/ 
