@@ -308,6 +308,7 @@ def test_canonical_cpu_configs_and_preflight():
         assert config["seed"] in {7, 42, 123}
         assert config["output_root"] not in output_roots
         output_roots.add(config["output_root"])
+        validate_canonical_baseline_config(config, git_dirty=False)
 
     clustered = yaml.safe_load((root / "configs/baselines/clustered_seed7.yaml").read_text())
     assert clustered["cluster_acceptance"] == {
@@ -322,12 +323,20 @@ def test_canonical_cpu_configs_and_preflight():
         validate_canonical_baseline_config(clustered, git_dirty=True)
 
     circular = yaml.safe_load((root / "configs/baselines/circular_seed7.yaml").read_text())
-    assert circular["circular_acceptance_criterion"] == (
-        "TODO: Finalize Circular baseline evaluation metric, acceptance threshold, and tolerance "
-        "before running the canonical Circular baseline experiments."
-    )
-    with pytest.raises(RuntimeError, match="Circular baseline evaluation metric"):
-        validate_canonical_baseline_config(circular, git_dirty=False)
+    assert circular["circular_acceptance"] == {
+        "metric": "wasserstein",
+        "aggregation": "mean",
+        "seeds": [7, 42, 123],
+        "maximum": 0.020,
+        "per_seed_pass_fail": False,
+    }
+    validate_canonical_baseline_config(circular, git_dirty=False)
+    invalid_circular = {
+        **circular,
+        "circular_acceptance": {**circular["circular_acceptance"], "maximum": 0.021},
+    }
+    with pytest.raises(RuntimeError, match="mean Wasserstein <= 0.020"):
+        validate_canonical_baseline_config(invalid_circular, git_dirty=False)
 
 
 def test_sha256_known_value_and_validation_cli_missing_input(tmp_path):

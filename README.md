@@ -163,7 +163,7 @@ Teacher `.npz` files expose `forward_sample_id`, `reverse_sample_id`, legacy pos
 
 Frozen teacher baselines use the strict Teacher artifact schema v1 (steps 0–6, `(batch, 2, 2)` complex128, tolerance 1e-8, both forward and reverse chains, unpickled scalar/string metadata with config/checkpoint hashes). See [`docs/TEACHER_ARTIFACT_SCHEMA.md`](docs/TEACHER_ARTIFACT_SCHEMA.md) for the full schema and policies.
 
-Canonical CPU baseline configs live in `configs/baselines/` (`clustered_seed{7,42,123}.yaml`, `circular_seed{7,42,123}.yaml`). They require a clean Git worktree and write an immutable `manifest.json` provenance record; reruns fail rather than overwrite. Clustered acceptance is aggregate-only: mean `F_gen,0 ≥ 0.95` across seeds 7/42/123, never per-seed. Circular configs carry an unresolved acceptance-metric TODO and are blocked by preflight.
+Canonical CPU baseline configs live in `configs/baselines/` (`clustered_seed{7,42,123}.yaml`, `circular_seed{7,42,123}.yaml`). They require a clean Git worktree and write an immutable `manifest.json` provenance record; reruns fail rather than overwrite. Acceptance is aggregate-only across seeds 7/42/123, never per-seed: Clustered requires mean `F_gen,0 ≥ 0.95`; Circular requires mean Wasserstein `≤ 0.020`.
 
 ```bash
 uv run --locked python scripts/train.py --config configs/baselines/clustered_seed7.yaml

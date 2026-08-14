@@ -28,7 +28,9 @@ provenance_manifest: true
 parent_run_id: null
 immutable_output: true
 output_root: outputs/baselines/circular_seed7
-# Preflight blocks canonical circular runs while this TODO is unresolved.
-circular_acceptance_criterion: >-
-  TODO: Finalize Circular baseline evaluation metric, acceptance threshold,
-  and tolerance before running the canonical Circular baseline experiments.
+circular_acceptance:
+  metric: wasserstein
+  aggregation: mean
+  seeds: [7, 42, 123]
+  maximum: 0.020
+  per_seed_pass_fail: false

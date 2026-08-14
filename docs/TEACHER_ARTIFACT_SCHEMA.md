@@ -54,11 +54,11 @@ repaired. Successful physicality reports include aggregate and per-step
   the complete validated run succeeds.
 - **Canonical preflight** (`provenance.validate_canonical_baseline_config`):
   canonical runs require a clean Git worktree, `device: cpu`,
-  `dtype: complex128`, `sampling_semantics: official`, schema v1, and
-  tolerance 1e-8. Circular configs whose `circular_acceptance_criterion`
-  still starts with `TODO:` are blocked.
-- **Clustered acceptance is aggregate-only:** mean `F_gen_0 >= 0.95` across
-  seeds 7/42/123; never a per-seed pass/fail.
+  `dtype: complex128`, `sampling_semantics: official`, schema v1, tolerance
+  1e-8, and the exact structured dataset acceptance policy.
+- **Acceptance is aggregate-only across seeds 7/42/123:** Clustered requires
+  mean `F_gen_0 >= 0.95`; Circular requires mean Wasserstein `<= 0.020`.
+  Neither policy permits a per-seed pass/fail decision.
 
 ## Manifest shape
 
@@ -98,15 +98,21 @@ uv run --locked python scripts/validate_teacher.py \
 Expected hashes are computed from the given paths; the CLI exits non-zero and
 prints the failing key/step/sample/reason on any violation.
 
-## Running a canonical baseline
+## Running canonical baselines
+
+Run only from a reviewed, clean commit. Each config has a unique immutable
+output root, so collisions fail instead of overwriting prior evidence.
 
 ```bash
-git status --porcelain  # must be empty
-uv run --locked python scripts/train.py --config configs/baselines/clustered_seed7.yaml
+git status --porcelain  # must print nothing
+for dataset in clustered circular; do
+  for seed in 7 42 123; do
+    uv run --locked python scripts/train.py \
+      --config "configs/baselines/${dataset}_seed${seed}.yaml"
+  done
+done
 ```
 
-Circular configs under `configs/baselines/` are intentionally blocked by
-preflight while this policy remains unresolved:
-
-> TODO: Finalize Circular baseline evaluation metric, acceptance threshold, and
-> tolerance before running the canonical Circular baseline experiments.
+After all six runs succeed, compute each criterion only from the three matching
+successful manifests: Clustered mean `F_gen_0 >= 0.95`; Circular mean
+`wasserstein <= 0.020`.

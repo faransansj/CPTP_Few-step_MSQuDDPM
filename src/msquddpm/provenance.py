@@ -121,11 +121,18 @@ def validate_canonical_baseline_config(config: dict, git_dirty: bool) -> None:
     if dataset not in {"clustered", "circular"} or config.get("seed") not in {7, 42, 123}:
         raise RuntimeError("Canonical baseline requires clustered/circular with seed 7, 42, or 123")
     if dataset == "circular":
-        criterion = str(config.get("circular_acceptance_criterion", ""))
-        if not criterion or criterion.startswith("TODO:"):
+        criterion = config.get("circular_acceptance", {})
+        expected = {
+            "metric": "wasserstein",
+            "aggregation": "mean",
+            "seeds": [7, 42, 123],
+            "maximum": 0.020,
+            "per_seed_pass_fail": False,
+        }
+        if criterion != expected:
             raise RuntimeError(
-                "Circular baseline evaluation metric is undefined: circular_acceptance_criterion "
-                "still contains a TODO; canonical circular runs are blocked until it is resolved"
+                "Circular canonical acceptance must be the structured three-seed aggregate "
+                "mean Wasserstein <= 0.020 policy, never a per-seed pass/fail"
             )
     if dataset == "clustered":
         criterion = config.get("cluster_acceptance", {})
