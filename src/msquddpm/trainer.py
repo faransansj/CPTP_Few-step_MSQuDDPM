@@ -22,8 +22,17 @@ def train_greedy(
     loss_name: str = "wasserstein",
     gamma: float = 1.0,
     log_every: int = 1,
+    sampling_semantics: str = "official",
+    lr_decay_count: int = 2,
 ) -> TrainResult:
     """Paper's T-to-1 greedy training; only the current block receives gradients."""
+    if sampling_semantics not in {"official", "replay"}:
+        raise ValueError(f"Unknown sampling semantics: {sampling_semantics}")
+    if epochs < 1:
+        raise ValueError("epochs must be positive")
+    if not 1 <= lr_decay_count <= epochs:
+        raise ValueError("lr_decay_count must be in [1, epochs]")
+    decay_interval = epochs // lr_decay_count
     rows: list[dict] = []
     batch = len(forward_trajectory.get_state(0))
     mixed = torch.eye(2, dtype=precision_for(model.theta.device).complex, device=model.theta.device)[None].repeat(batch, 1, 1) / 2
@@ -41,19 +50,32 @@ def train_greedy(
             for stage_t in range(model.steps, t - 1, -1)
         }
         measurement_rng = torch.Generator().manual_seed(model.seed + 20_000 * t)
-        for epoch in range(epochs):
-            optimizer.zero_grad()
-            current = mixed
-            # Replay later trained blocks; detach to train only theta_t.
+        stage_input = mixed
+        if sampling_semantics == "official":
+            # Official code samples later trained blocks once before this stage's
+            # epoch loop; only the current block's measurement is resampled.
             with torch.no_grad():
                 for fixed_t in range(model.steps, t, -1):
-                    current = model.reverse_step(
-                        current,
+                    stage_input = model.reverse_step(
+                        stage_input,
                         fixed_t,
                         validate=False,
                         ancilla_states=fixed_ancillas[fixed_t],
                         measurement_generator=measurement_rng,
                     )
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            current = stage_input
+            if sampling_semantics == "replay":
+                with torch.no_grad():
+                    for fixed_t in range(model.steps, t, -1):
+                        current = model.reverse_step(
+                            current,
+                            fixed_t,
+                            validate=False,
+                            ancilla_states=fixed_ancillas[fixed_t],
+                            measurement_generator=measurement_rng,
+                        )
             output = model.reverse_step(
                 current.detach(),
                 t,
@@ -68,7 +90,10 @@ def train_greedy(
                 mask[t - 1] = 1
                 model.theta.grad.mul_(mask)
             optimizer.step()
-            scheduler.step()
+            # Mirrors the official integer-interval cadence exactly. Its CLI
+            # count-minus-one description holds for the paper's 2001/2 setting.
+            if gamma != 1.0 and (epoch + 1) % decay_interval == 0 and epoch + 2 < epochs:
+                scheduler.step()
             if epoch % log_every == 0 or epoch == epochs - 1:
                 rows.append(
                     {

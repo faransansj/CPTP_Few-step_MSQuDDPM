@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -33,17 +34,19 @@ def test_datasets_and_forward_are_physical_and_mix():
         assert radii[-1] < 1e-6
 
 
-def test_pqc_order_is_rx_then_ry_then_cz():
-    model = ReverseMSQuDDPM(steps=1, n_ancilla=1, depth=1, ancilla="zero", seed=3)
+def test_pqc_order_is_rx_then_ry_then_all_neighboring_cz():
+    model = ReverseMSQuDDPM(steps=1, n_ancilla=2, depth=1, ancilla="zero", seed=3)
     with torch.no_grad():
         model.theta.zero_()
         model.theta[0, 0, 0] = torch.tensor([0.71, -0.43])
-    rx = _expand_gate(_rx(model.theta[0, 0, 0, 0]), 0, 2)
-    ry = _expand_gate(_ry(model.theta[0, 0, 0, 1]), 0, 2)
-    expected = _cz(2, 0, model.theta.device) @ ry @ rx
-    wrong = _cz(2, 0, model.theta.device) @ rx @ ry
+    rx = _expand_gate(_rx(model.theta[0, 0, 0, 0]), 0, 3)
+    ry = _expand_gate(_ry(model.theta[0, 0, 0, 1]), 0, 3)
+    expected = _cz(3, 1, model.theta.device) @ _cz(3, 0, model.theta.device) @ ry @ rx
+    wrong_order = _cz(3, 1, model.theta.device) @ _cz(3, 0, model.theta.device) @ rx @ ry
+    missing_neighbor = _cz(3, 0, model.theta.device) @ ry @ rx
     assert torch.allclose(model._unitary(1), expected)
-    assert not torch.allclose(expected, wrong)
+    assert not torch.allclose(expected, wrong_order)
+    assert not torch.allclose(expected, missing_neighbor)
 
 
 def test_losses_reverse_api_and_trajectory_roundtrip(tmp_path):
@@ -64,6 +67,35 @@ def test_losses_reverse_api_and_trajectory_roundtrip(tmp_path):
         loaded = load_trajectory(path)
         for t in trajectory.steps:
             assert torch.allclose(trajectory.get_state(t), loaded.get_state(t))
+
+
+def test_training_sampling_semantics_and_decay_cadence():
+    states = clustered_states(4, seed=12)
+    forward = ForwardDiffusion(2).diffuse(states)
+
+    calls = {}
+    for semantics in ("official", "replay"):
+        model = ReverseMSQuDDPM(2, n_ancilla=1, depth=1, ancilla="zero", seed=12)
+        with patch.object(model, "reverse_step", wraps=model.reverse_step) as reverse_step:
+            train_greedy(model, forward, epochs=2, learning_rate=0.01, loss_name="mmd", sampling_semantics=semantics)
+        calls[semantics] = reverse_step.call_count
+    assert calls == {"official": 5, "replay": 6}
+
+    model = ReverseMSQuDDPM(1, n_ancilla=1, depth=1, ancilla="zero", seed=12)
+    one_step = Trajectory({0: forward.get_state(0), 1: forward.get_state(1)}, "forward")
+    history = train_greedy(model, one_step, epochs=8, learning_rate=0.01, loss_name="mmd", gamma=0.5, lr_decay_count=4).history
+    assert history["learning_rate"].tolist() == pytest.approx([0.01, 0.005, 0.005, 0.0025, 0.0025, 0.00125, 0.00125, 0.00125])
+
+    model = ReverseMSQuDDPM(1, n_ancilla=1, depth=1, ancilla="zero", seed=12)
+    history = train_greedy(model, one_step, epochs=9, learning_rate=0.01, loss_name="mmd", gamma=0.5, lr_decay_count=2).history
+    assert history["learning_rate"].tolist() == pytest.approx([0.01, 0.01, 0.01, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005])
+
+    with pytest.raises(ValueError, match="sampling semantics"):
+        train_greedy(model, one_step, epochs=1, learning_rate=0.01, sampling_semantics="unknown")
+    with pytest.raises(ValueError, match="epochs must be positive"):
+        train_greedy(model, one_step, epochs=0, learning_rate=0.01)
+    with pytest.raises(ValueError, match="lr_decay_count"):
+        train_greedy(model, one_step, epochs=1, learning_rate=0.01, lr_decay_count=2)
 
 
 def test_validation_does_not_project_or_modify_reverse_output():

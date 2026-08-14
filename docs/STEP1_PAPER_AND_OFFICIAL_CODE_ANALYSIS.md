@@ -76,7 +76,7 @@ Step당 parameter 수:
 2(n+n_a)L.
 \]
 
-공식 코드는 alternating open-chain CZ pairing을 사용한다.
+공식 코드는 각 layer에서 even pair loop와 odd pair loop를 모두 실행하여 open chain의 모든 neighboring CZ를 적용한다. 이를 layer별 alternating으로 해석하면 일부 edge가 누락된다.
 
 ### 4.2 Ancilla
 
@@ -236,7 +236,7 @@ Stack: Python 3.11.7, PyTorch 2.2.0, TensorCircuit 0.11.0, NumPy 1.26.4, SciPy 1
 | A-001 | cosine offset `epsilon=0.001` | 논문 미기재, official code 값 |
 | A-002 | beta clipping `[1e-4,1]` | official code |
 | A-003 | dataset \(q_0\)는 uniform sampling | official code 및 interval 문맥 |
-| A-004 | general entanglement는 official alternating open-chain CZ | 논문 general topology 불완전 |
+| A-004 | general entanglement는 매 layer마다 official open-chain의 모든 neighboring CZ 적용 | 논문 general topology 불완전; official code의 even/odd loop 확인 |
 | A-005 | reverse는 official code와 같은 sampled conditional branch | paper branching 설명 + official code |
 | A-006 | paper에 없는 LR/epochs/decay는 config에 assumption으로 기록; `gamma=1`은 no effective decay | 임의의 paper fact 주장 방지 |
 | A-007 | `n_test` 및 error-bar 반복 수는 reproduction config가 명시 | paper 미기재 |

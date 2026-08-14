@@ -102,7 +102,7 @@ class ReverseMSQuDDPM(nn.Module):
             for qubit in range(total):
                 unitary = _expand_gate(_rx(self.theta[t - 1, layer, qubit, 0]), qubit, total) @ unitary
                 unitary = _expand_gate(_ry(self.theta[t - 1, layer, qubit, 1]), qubit, total) @ unitary
-            for left in range(layer % 2, total - 1, 2):
+            for left in range(total - 1):
                 unitary = _cz(total, left, self.theta.device, self.precision.complex) @ unitary
         return unitary
 

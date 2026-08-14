@@ -4,11 +4,12 @@ This document is planning-only. It does **not** implement a Few-Step model, stud
 
 ## Current baseline status
 
-- Original 1-qubit MSQuDDPM pipeline, MPS execution, intermediate trajectories, metrics, and 12 figures are implemented.
-- Paper-scale MPS runs completed for clustered and circular datasets with seeds 7, 42, 123; all six trajectories are physical and complete through `T=6`.
-- Circular is close to Table I: Wasserstein `0.01396±0.00179` versus paper generated `0.0151`.
-- Clustered failed consistently: `F_gen,0=0.50468±0.02203` versus paper `0.9873`; target data metric matches (`0.98588±0.00099` versus `0.9853`).
-- Evidence: [`PAPER_SCALE_MPS_RESULTS.md`](PAPER_SCALE_MPS_RESULTS.md), `outputs/metrics/paper_scale_mps_multiseed*.{csv,json}`, checkpoints, logs, and teacher trajectories.
+- Original 1-qubit MSQuDDPM pipeline, intermediate trajectories, metrics, and 12 figures are implemented.
+- The clustered failure was caused by alternating CZ edges instead of every neighboring CZ in every layer.
+- Corrected native/TensorCircuit deterministic unitary parity reached maximum error `3.33e-16` against tolerance `1e-12` (`scripts/check_tensorcircuit_parity.py`).
+- Corrected clustered CPU diagnostics over seeds 7/42/123 reached `F_gen,0=0.96269±0.02010`, passing the predeclared mean target `0.95`.
+- Earlier clustered and circular MPS results used the wrong circuit and are invalidated historical evidence.
+- Clean committed CPU reruns, provenance, and baseline tagging remain incomplete.
 
 ## Hard gate before future model research
 
@@ -20,38 +21,30 @@ Do not freeze the teacher baseline or start CPTP Few-Step implementation until a
 4. Every accepted teacher checkpoint has complete step 0–6 trajectories, schema validation, checksums, and environment/commit metadata.
 5. A baseline version is tagged and its artifacts are read-only.
 
-Current gate: **BLOCKED by clustered reproduction**.
+Current gate: **Clustered root cause resolved in code; baseline freeze artifacts remain**.
+
+## Backend decision
+
+MPS revalidation is intentionally dropped. The prior MPS failures were produced by the incorrect alternating-CZ implementation and do not demonstrate an Apple Silicon precision defect. CPU is the acceptance backend; CUDA parity remains optional for server deployment. MPS support and configs remain available as non-baseline engineering paths, but no MPS rerun is required for baseline freeze.
 
 ## Prioritized TODOs
 
 | Priority | Owner | Work | Artifact | Acceptance check |
 |---|---|---|---|---|
-| P0 | Reproduction engineer | Run clustered root-cause matrix below | `outputs/ablations/clustered/*.csv` | At least 3 seeds for promoted setting; physical trajectories; result explained |
-| P0 | Quantum reviewer | Establish official TensorCircuit parity on one deterministic batch/block | parity notebook/report + tensors | Unitary/output/loss agree within precision tolerance |
-| P0 | Research lead | Decide resolved vs explicitly bounded clustered baseline | signed decision in reproduction report | Hard gate outcome unambiguous |
+| P0 | Reproduction engineer | Finalize corrected circuit and official training-semantics regression tests | code + tests | Full test suite passes; independent review passes |
 | P0 | Reproduction engineer | Record immutable provenance | manifests/checksums/config copies | Fresh loader verifies every artifact |
+| P0 | Reproduction engineer | Regenerate clustered and circular CPU baselines from a clean commit | checkpoints + trajectories + metrics | Three physical seeds per dataset; clustered mean `F_gen,0≥0.95` |
 | P1 | Metrics owner | Match paper circular evaluation protocol, including independent data baseline | metric protocol + CSV | Recomputed result is reproducible from saved states |
-| P1 | Validation owner | CPU/CUDA cross-backend parity on selected seeds | parity CSV/report | Expected precision differences bounded; physicality passes |
+| P1 | Validation owner | Run CUDA parity only if CUDA deployment is selected | parity CSV/report | Expected precision differences bounded; physicality passes |
 | P1 | Data owner | Freeze teacher trajectory contract | versioned schema + tests | Consumer can select any `rho_t` and rejects incompatible files |
 | P2 | Infrastructure owner | Add resumable per-step checkpoints and server job templates | scripts/docs only after review | Interrupted training resumes identically |
 | P2 | Visualization owner | Aggregate multi-seed figures/error bars | final figure directory | Figures derive only from manifest-listed runs |
 
-## Clustered root-cause experiment matrix
+## Completed clustered root-cause analysis
 
-Change one factor at a time from the current paper-v2/MPS seed-42 baseline, then promote plausible settings to seeds 7/42/123.
+The source-level CZ mismatch is confirmed by TensorCircuit parity and corrected CPU three-seed training. Sampling replay changed seed-42 `F_gen,0` only from `0.94952` to `0.94849`, so it was not the cause of the former `≈0.5` result. The width, ancilla, initialization, optimizer, dataset, and MPS matrices are cancelled to avoid uninformative compute after confirmation of a single root cause.
 
-| Factor | Levels | Why |
-|---|---|---|
-| Cluster width | paper v2 `epsilon=0.08`; official code `0.04` | Concrete paper/code discrepancy |
-| Ancilla | Haar+zero; all-zero | Paper reports both; isolates stochastic input effect |
-| Initialization | normal; Xavier with normal ancilla parameters | Both described by paper/official code |
-| Optimizer | LR `{1e-3, 5e-3, 1e-2}`; decay `{gamma=1, documented exponential candidates}`; epochs `{500,2001,4000}` | Paper omits exact per-task schedule |
-| Sampling semantics | fixed Haar per stage + fresh measurement; fully fresh; official-code-exact | Current interpretation may differ from artifact-generating code |
-| Framework | native PyTorch; official TensorCircuit | Detect simulator/gate/measurement parity errors |
-| Dataset semantics | paper-normalized recipe; official generator exact | Rule out sample construction differences |
-| Precision/backend | MPS complex64; CPU/CUDA complex128 | Bound low-precision impact |
-
-Every run must save: source commit, dirty diff hash, full config, seed, Python/package lock, device/precision, start/end/runtime/RSS, checkpoint hash, history, metrics, forward/reverse/teacher trajectory hashes, physicality report, and parent run ID. Do not promote settings selected from one seed without confirmatory seeds.
+Every baseline rerun must save: source commit, dirty diff hash, full config, seed, Python/package lock, device/precision, start/end/runtime/RSS, checkpoint hash, history, metrics, forward/reverse/teacher trajectory hashes, physicality report, and parent run ID. Do not promote settings selected from one seed without confirmatory seeds.
 
 ## Baseline freeze and teacher trajectory contract
 

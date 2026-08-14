@@ -4,7 +4,7 @@ PyTorch density-matrix reproduction of *Mixed-State Quantum Denoising Diffusion 
 
 This repository implements only the original MSQuDDPM teacher baseline. It does **not** implement Few-Step students or distillation.
 
-Current paper-scale MPS evidence and the gated planning-only next phase are documented in [`docs/PAPER_SCALE_MPS_RESULTS.md`](docs/PAPER_SCALE_MPS_RESULTS.md) and [`docs/NEXT_PHASE_ROADMAP.md`](docs/NEXT_PHASE_ROADMAP.md). The circular baseline is close to Table I across three seeds; the clustered reproduction remains unresolved, so the teacher baseline is not yet frozen.
+The clustered failure was traced to an incorrect alternating-CZ implementation: the official circuit applies every neighboring CZ in every layer. After correction, a diagnostic CPU three-seed run reached `F_gen,0=0.96269±0.02010`, passing the predeclared mean target of `0.95`. The earlier MPS results used the incorrect circuit and are retained only as invalidated historical evidence. The teacher baseline remains unfrozen until clean CPU artifacts and provenance are recorded; see [`docs/REPRODUCTION_REPORT.md`](docs/REPRODUCTION_REPORT.md) and [`docs/NEXT_PHASE_ROADMAP.md`](docs/NEXT_PHASE_ROADMAP.md).
 
 ## Installation
 
@@ -178,4 +178,5 @@ Teacher `.npz` files expose `forward_sample_id`, `reverse_sample_id`, legacy pos
 
 - [x] Step 1: paper/official-code analysis
 - [x] Steps 2–8: modular implementation and CPU smoke validation
-- [ ] Independent paper-scale multi-seed Table-I reproduction (resource-intensive)
+- [x] Clustered root cause isolated and corrected; diagnostic CPU three-seed mean passes target
+- [ ] Clean CPU multi-seed baseline regeneration, provenance, and freeze

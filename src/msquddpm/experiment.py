@@ -26,7 +26,11 @@ def train_experiment(config: dict) -> dict:
         steps=int(config["T"]), n_ancilla=int(config["n_ancilla"]), depth=int(config["depth"]),
         ancilla=config["ancilla"], seed=seed, init=config.get("init", "normal"), device=device
     )
-    result = train_greedy(model, forward, int(config["epochs"]), float(config["learning_rate"]), config["loss"], float(config.get("gamma", 1.0)))
+    result = train_greedy(
+        model, forward, int(config["epochs"]), float(config["learning_rate"]), config["loss"],
+        float(config.get("gamma", 1.0)), sampling_semantics=config.get("sampling_semantics", "official"),
+        lr_decay_count=int(config.get("lr_decay_count", 2))
+    )
     mixed = torch.eye(2,dtype=precision_for(device).complex,device=device)[None].repeat(len(dataset),1,1)/2
     reverse = model.generate(mixed, return_trajectory=True)
     checkpoint = output["checkpoints"] / f"{name}.pt"

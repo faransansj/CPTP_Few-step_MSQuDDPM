@@ -13,6 +13,8 @@ loss: wasserstein
 epochs: 2001  # ASSUMPTION: official CLI default, not reported per-task by paper.
 learning_rate: 0.005  # ASSUMPTION: official CLI default.
 gamma: 1.0  # ASSUMPTION: no effective decay; paper factor/cadence unknown.
+lr_decay_count: 2
+sampling_semantics: official
 init: normal
 device: mps
 output_root: outputs
